@@ -1,0 +1,20 @@
+[package]
+name = "zipcrack"
+version = "0.1.0"
+authors = ["nnmm <nnmmgit@gmail.com>"]
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1"
+arrayvec = "0.7"
+crossterm = "0.21"
+ctrlc = "3"
+nom = "7"
+serde_json = "1"
+structopt = "0.3"
+
+[profile.release]
+codegen-units = 1
+debug = true
