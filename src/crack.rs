@@ -1,11 +1,10 @@
 use crate::decrypt::{
-    encryption_data_matches, password_block_matches, EncryptionData, PasswordBlock, RESULT_CAPACITY,
+    encryption_data_matches, password_matches_unrolled, PasswordBlock,
+    EncryptionData, RESULT_CAPACITY,
 };
 use crate::info::{run_with_info_thread, InfoData};
 use crate::opt::Opt;
-use crate::password_iter::{
-    test_each_password, test_each_password_unrolled,
-};
+use crate::password_iter::{test_each_password, test_each_password_unrolled};
 use crate::zipfile::Record;
 
 use arrayvec::ArrayVec;
@@ -46,7 +45,7 @@ pub fn crack_unrolled(opt: Opt, zipfile: &[Record]) {
     let callback = move |password_block: PasswordBlock| -> Vec<Vec<u8>> {
         let mut iter = eds.iter();
         if let Some(ed) = iter.next() {
-            password_block_matches(password_block, *ed, &mut matching_chars);
+            password_matches_unrolled(password_block, *ed, &mut matching_chars);
         };
         if matching_chars.is_empty() {
             return Vec::new();
@@ -55,7 +54,7 @@ pub fn crack_unrolled(opt: Opt, zipfile: &[Record]) {
         // Ok, the password passed the first file – check against the other files
         let mut matching_chars_other = ArrayVec::<u8, RESULT_CAPACITY>::new();
         for ed in iter {
-            password_block_matches(password_block, *ed, &mut matching_chars_other);
+            password_matches_unrolled(password_block, *ed, &mut matching_chars_other);
             // Intersection of two
             matching_chars.retain(|ch| matching_chars_other.contains(ch));
             matching_chars_other.clear();

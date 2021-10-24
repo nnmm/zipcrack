@@ -80,10 +80,22 @@ pub fn for_each_password_unrolled(opt: &Opt, mut callback: impl FnMut(PasswordBl
     // TODO: Check that the start_password is respected here
     modified_opt.min_length = modified_opt.min_length.saturating_sub(1);
     modified_opt.max_length = modified_opt.max_length.saturating_sub(1);
+    let chunked_alphabet: Vec<_> = opt
+        .alphabet
+        .0
+        .chunks(8)
+        .map(|slice| {
+            // This will pad the last chunk to 8. Unwrap is safe since chunks() doesn't yield empty slices.
+            let mut arr = [*slice.last().unwrap(); 8];
+            arr[..slice.len()].clone_from_slice(slice);
+            arr
+        })
+        .collect();
+
     let callback_for_single_password = move |pw: &[u8], initialized_keys: InitializedKeys| {
         let password_block = PasswordBlock {
             password_prefix: pw,
-            alphabet: &opt.alphabet.0,
+            alphabet: chunked_alphabet.as_slice(),
             initialized_keys,
         };
         callback(password_block);
@@ -146,7 +158,6 @@ pub fn test_each_password_unrolled(
     };
     for_each_password_unrolled(opt, callback_with_info);
 }
-
 
 #[cfg(test)]
 mod test {

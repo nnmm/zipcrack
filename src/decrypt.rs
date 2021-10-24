@@ -93,38 +93,227 @@ pub struct PasswordBlock<'a> {
     /// All letters except the last one
     pub password_prefix: &'a [u8],
     /// Alphabet to sample the last letters from
-    pub alphabet: &'a [u8],
+    pub alphabet: &'a [[u8; 8]],
     /// Keys initialized with the password prefix
     pub initialized_keys: [u32; 3],
 }
 
+pub fn crc32_chunked(crc: [u32; 8], byte: [u8; 8]) -> [u32; 8] {
+    let mut result = [0; 8];
+    for i in 0..8 {
+        let index = crc[i] as u8 ^ byte[i];
+        result[i] = CRC_32_TAB[index as usize] ^ (crc[i] >> 8);
+    }
+    result
+}
+
+#[inline(always)]
+pub fn update_keys_chunked(keys: &mut [[u32; 8]; 3], c: [u8; 8]) {
+    keys[0] = crc32_chunked(keys[0], c);
+    let mut keys1_shifted = [0; 8];
+    for i in 0..8 {
+        keys[1][i] = (Wrapping(keys[1][i]) + Wrapping(keys[0][i] & 0x000000ff)).0;
+        keys[1][i] = (Wrapping(keys[1][i]) * Wrapping(134775813) + Wrapping(1)).0;
+        keys1_shifted[i] = (keys[1][i] >> 24) as u8;
+    }
+    keys[2] = crc32_chunked(keys[2], keys1_shifted);
+}
+
+#[inline(always)]
+pub fn decrypt_byte_chunked(key2: [u32; 8]) -> [u8; 8] {
+    let mut res = [0; 8];
+    for i in 0..8 {
+        let temp = key2[i] as u16 | 2;
+        let byte = (Wrapping(temp) * Wrapping(temp ^ 1)).0 >> 8;
+        res[i] = byte as u8;
+    }
+    res
+}
+
 #[inline(never)]
-pub fn password_block_matches(
+pub fn password_matches_unrolled(
     password_block: PasswordBlock,
     ed: EncryptionData,
     matching_chars: &mut ArrayVec<u8, RESULT_CAPACITY>,
 ) {
-    // Here the last letter of the password is unrolled:
-    // This way, we don't repeat the block above for passwords that are identical apart from the last letter.
-    for &last_char in password_block.alphabet {
-        let mut keys_for_char = password_block.initialized_keys;
-        let mut encryption_header_for_char = ed.encryption_header;
-        update_keys(&mut keys_for_char, last_char);
+    // Here the last letter of the password is checked, 8 letters at a time
+    for &last_char_chunk in password_block.alphabet {
+        let mut keys_chunk = [
+            [
+                password_block.initialized_keys[0],
+                password_block.initialized_keys[0],
+                password_block.initialized_keys[0],
+                password_block.initialized_keys[0],
+                password_block.initialized_keys[0],
+                password_block.initialized_keys[0],
+                password_block.initialized_keys[0],
+                password_block.initialized_keys[0],
+            ],
+            [
+                password_block.initialized_keys[1],
+                password_block.initialized_keys[1],
+                password_block.initialized_keys[1],
+                password_block.initialized_keys[1],
+                password_block.initialized_keys[1],
+                password_block.initialized_keys[1],
+                password_block.initialized_keys[1],
+                password_block.initialized_keys[1],
+            ],
+            [
+                password_block.initialized_keys[2],
+                password_block.initialized_keys[2],
+                password_block.initialized_keys[2],
+                password_block.initialized_keys[2],
+                password_block.initialized_keys[2],
+                password_block.initialized_keys[2],
+                password_block.initialized_keys[2],
+                password_block.initialized_keys[2],
+            ],
+        ];
+        update_keys_chunked(&mut keys_chunk, last_char_chunk);
 
+        let mut encryption_header_chunk = [
+            [
+                ed.encryption_header[0],
+                ed.encryption_header[0],
+                ed.encryption_header[0],
+                ed.encryption_header[0],
+                ed.encryption_header[0],
+                ed.encryption_header[0],
+                ed.encryption_header[0],
+                ed.encryption_header[0],
+            ],
+            [
+                ed.encryption_header[1],
+                ed.encryption_header[1],
+                ed.encryption_header[1],
+                ed.encryption_header[1],
+                ed.encryption_header[1],
+                ed.encryption_header[1],
+                ed.encryption_header[1],
+                ed.encryption_header[1],
+            ],
+            [
+                ed.encryption_header[2],
+                ed.encryption_header[2],
+                ed.encryption_header[2],
+                ed.encryption_header[2],
+                ed.encryption_header[2],
+                ed.encryption_header[2],
+                ed.encryption_header[2],
+                ed.encryption_header[2],
+            ],
+            [
+                ed.encryption_header[3],
+                ed.encryption_header[3],
+                ed.encryption_header[3],
+                ed.encryption_header[3],
+                ed.encryption_header[3],
+                ed.encryption_header[3],
+                ed.encryption_header[3],
+                ed.encryption_header[3],
+            ],
+            [
+                ed.encryption_header[4],
+                ed.encryption_header[4],
+                ed.encryption_header[4],
+                ed.encryption_header[4],
+                ed.encryption_header[4],
+                ed.encryption_header[4],
+                ed.encryption_header[4],
+                ed.encryption_header[4],
+            ],
+            [
+                ed.encryption_header[5],
+                ed.encryption_header[5],
+                ed.encryption_header[5],
+                ed.encryption_header[5],
+                ed.encryption_header[5],
+                ed.encryption_header[5],
+                ed.encryption_header[5],
+                ed.encryption_header[5],
+            ],
+            [
+                ed.encryption_header[6],
+                ed.encryption_header[6],
+                ed.encryption_header[6],
+                ed.encryption_header[6],
+                ed.encryption_header[6],
+                ed.encryption_header[6],
+                ed.encryption_header[6],
+                ed.encryption_header[6],
+            ],
+            [
+                ed.encryption_header[7],
+                ed.encryption_header[7],
+                ed.encryption_header[7],
+                ed.encryption_header[7],
+                ed.encryption_header[7],
+                ed.encryption_header[7],
+                ed.encryption_header[7],
+                ed.encryption_header[7],
+            ],
+            [
+                ed.encryption_header[8],
+                ed.encryption_header[8],
+                ed.encryption_header[8],
+                ed.encryption_header[8],
+                ed.encryption_header[8],
+                ed.encryption_header[8],
+                ed.encryption_header[8],
+                ed.encryption_header[8],
+            ],
+            [
+                ed.encryption_header[9],
+                ed.encryption_header[9],
+                ed.encryption_header[9],
+                ed.encryption_header[9],
+                ed.encryption_header[9],
+                ed.encryption_header[9],
+                ed.encryption_header[9],
+                ed.encryption_header[9],
+            ],
+            [
+                ed.encryption_header[10],
+                ed.encryption_header[10],
+                ed.encryption_header[10],
+                ed.encryption_header[10],
+                ed.encryption_header[10],
+                ed.encryption_header[10],
+                ed.encryption_header[10],
+                ed.encryption_header[10],
+            ],
+            [
+                ed.encryption_header[11],
+                ed.encryption_header[11],
+                ed.encryption_header[11],
+                ed.encryption_header[11],
+                ed.encryption_header[11],
+                ed.encryption_header[11],
+                ed.encryption_header[11],
+                ed.encryption_header[11],
+            ],
+        ];
         // 6.1.6 Decrypting the encryption header
-        for buf in &mut encryption_header_for_char {
-            let c: u8 = *buf ^ decrypt_byte(keys_for_char[2]);
-            update_keys(&mut keys_for_char, c);
-            *buf = c;
+        for buf in &mut encryption_header_chunk {
+            let c: u64 =
+                u64::from_le_bytes(*buf) ^ u64::from_le_bytes(decrypt_byte_chunked(keys_chunk[2]));
+            update_keys_chunked(&mut keys_chunk, c.to_le_bytes());
+            *buf = c.to_le_bytes();
         }
 
         // The last bytes in buffer should be the timestamp
-        if encryption_header_for_char[10..] == ed.last_mod_file_time.to_le_bytes() {
-            matching_chars.push(last_char);
+        let low_byte = ed.last_mod_file_time.to_le_bytes()[0];
+        let high_byte = ed.last_mod_file_time.to_le_bytes()[1];
+        for i in 0..8 {
+            if encryption_header_chunk[10][i] == low_byte
+                && encryption_header_chunk[11][i] == high_byte
+            {
+                matching_chars.push(last_char_chunk[i]);
+            }
         }
     }
 }
-
 
 #[cfg(test)]
 mod test {
