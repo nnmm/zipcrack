@@ -22,6 +22,7 @@ fn result_main() -> Result<()> {
         std::process::exit(0); // kthxbai
     })
     .expect("Error setting Ctrl-C handler");
+
     if opt.unroll {
         crack::crack_unrolled(opt, &records);
     } else {

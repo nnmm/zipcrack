@@ -1,4 +1,5 @@
 use std::io::{stdout, Stdout};
+use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -52,8 +53,13 @@ fn final_stats(data: Arc<InfoData>) {
     );
 }
 
-fn log(counter: u64, found_passwords: &[String], recent_password: &str) -> Result<()> {
-    let file = std::fs::File::create("zipcrack_log.json")?;
+fn log(
+    filename: &Path,
+    counter: u64,
+    found_passwords: &[String],
+    recent_password: &str,
+) -> Result<()> {
+    let file = std::fs::File::create(filename)?;
     let writer = std::io::BufWriter::new(file);
     let value = json::json!({
         "counter": counter,
@@ -65,7 +71,7 @@ fn log(counter: u64, found_passwords: &[String], recent_password: &str) -> Resul
 }
 
 const NUM_STATUS_LINES: u16 = 2;
-pub fn spawn_info_thread(_opt: Opt, data: Arc<InfoData>) -> thread::JoinHandle<()> {
+pub fn spawn_info_thread(opt: Opt, data: Arc<InfoData>) -> thread::JoinHandle<()> {
     // We might have a duration of more than a second between loops, so it's best to measure
     // the elapsed time to calculate the number of passwords per second.
     let start_time = Instant::now();
@@ -102,7 +108,12 @@ pub fn spawn_info_thread(_opt: Opt, data: Arc<InfoData>) -> thread::JoinHandle<(
 
             if log_timer.elapsed() > Duration::from_secs(60) {
                 log_timer = Instant::now();
-                if let Err(e) = log(cur_counter, &found_passwords, &recent_password) {
+                if let Err(e) = log(
+                    &opt.logfile,
+                    cur_counter,
+                    &found_passwords,
+                    &recent_password,
+                ) {
                     restore_terminal(&mut stdout);
                     eprintln!("Error writing logfile: {}", e);
                     return;
@@ -115,10 +126,10 @@ pub fn spawn_info_thread(_opt: Opt, data: Arc<InfoData>) -> thread::JoinHandle<(
     })
 }
 
-pub fn run_with_info_thread(opt: &Opt, f: impl FnOnce(&Opt, &InfoData)) {
+pub fn run_with_info_thread(opt: Opt, f: impl FnOnce(Opt, Arc<InfoData>)) {
     let info_data = InfoData::new();
     let join_handle = spawn_info_thread(opt.clone(), info_data.clone());
-    f(opt, &info_data);
+    f(opt, info_data);
     // The thread should terminate when it notices that the counter doesn't increment any more.
     if let Err(e) = join_handle.join() {
         std::panic::resume_unwind(e);

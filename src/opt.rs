@@ -4,36 +4,44 @@ use structopt::StructOpt;
 #[derive(Clone, StructOpt)]
 #[structopt(
     name = "zipcrack",
-    about = "Attempts to crack a ZIP archive's password with brute force. It is assumed that all files have the same password. There may be false positives if the number of files in the archive is very small."
+    about = "Attempts to crack a ZIP archive's password with brute force."
 )]
 pub struct Opt {
+    /// The alphabet to build passwords from. Can be "base64" or "custom:<letters>".
+    #[structopt(short, long)]
+    pub alphabet: Alphabet,
+
     /// Input ZIP file. Should contain several files to eliminate false positives.
     #[structopt(parse(from_os_str))]
     pub input: PathBuf,
 
-    /// Prints out the records inside the ZIP file
-    #[structopt(long)]
-    pub show_zipfile_records: bool,
-
-    /// The minimum password length
-    #[structopt(long, default_value = "1")]
-    pub min_length: u8,
+    /// Logfile where progress is saved
+    #[structopt(long, parse(from_os_str), default_value = "zipcrack_log.json")]
+    pub logfile: PathBuf,
 
     /// The maximum password length
     #[structopt(long, default_value = "10")]
     pub max_length: u8,
 
-    /// Do not start at the alphabetically lowest password, but from this string.
+    /// The minimum password length
+    #[structopt(long, default_value = "1")]
+    pub min_length: u8,
+
+    /// Starts the search from this string, not the alphabetically lowest password
     #[structopt(long)]
     pub start_password: Option<String>,
 
-    /// The alphabet to build passwords from. Can be "base64" or "custom:<letters>".
-    #[structopt(short, long)]
-    pub alphabet: Alphabet,
+    /// Prints out the records inside the ZIP file
+    #[structopt(long)]
+    pub show_zipfile_records: bool,
 
     /// Uses the unrolled version of the algorithm
     #[structopt(long)]
     pub unroll: bool,
+
+    /// How many threads to spawn
+    #[structopt(long, default_value = "1")]
+    pub num_threads: u8,
 }
 
 #[derive(Clone)]
